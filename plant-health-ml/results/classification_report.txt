@@ -1,0 +1,8 @@
+              precision    recall  f1-score   support
+
+     Healthy       0.99      0.99      0.99      2263
+   Unhealthy       1.00      1.00      1.00      5884
+
+    accuracy                           1.00      8147
+   macro avg       0.99      1.00      0.99      8147
+weighted avg       1.00      1.00      1.00      8147

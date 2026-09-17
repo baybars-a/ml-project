@@ -1,0 +1,15 @@
+# Datasets are far too large for git (1.9 GB, 108k files)
+plant-health-ml/dataset/
+
+# Separate earlier project, not part of this deliverable
+PalmTreesResNetModel/
+
+# Python
+__pycache__/
+*.pyc
+venv/
+.venv/
+
+# OS
+.DS_Store
+Thumbs.db

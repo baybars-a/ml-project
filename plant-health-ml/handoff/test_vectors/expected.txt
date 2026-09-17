@@ -1,0 +1,5 @@
+file, true class, expected sigmoid output (tflite)
+healthy__RS_HL 7544.JPG, Healthy, 0.000002
+healthy__RS_HL 5941.JPG, Healthy, 0.013255
+unhealthy__FREC_Scab 3335.JPG, Unhealthy, 0.999992
+unhealthy__FREC_Scab 3504.JPG, Unhealthy, 0.998636
