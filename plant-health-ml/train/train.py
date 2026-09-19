@@ -1,4 +1,5 @@
 import os
+import json
 import numpy as np
 import matplotlib
 matplotlib.use("Agg")
@@ -19,7 +20,7 @@ train_ds = keras.utils.image_dataset_from_directory(
     "dataset/train",
     image_size=(160, 160),
     batch_size=32,
-    label_mode="binary",
+    label_mode="int",
     shuffle=True,
     seed=42
 )
@@ -28,7 +29,7 @@ val_ds = keras.utils.image_dataset_from_directory(
     "dataset/val",
     image_size=(160, 160),
     batch_size=32,
-    label_mode="binary",
+    label_mode="int",
     shuffle=False
 )
 
@@ -36,14 +37,20 @@ test_ds = keras.utils.image_dataset_from_directory(
     "dataset/test",
     image_size=(160, 160),
     batch_size=32,
-    label_mode="binary",
+    label_mode="int",
     shuffle=False
 )
 
 classes = train_ds.class_names
+num_classes = len(classes)
+
 print("")
-print("Classes: " + str(classes))
+print("Classes found: " + str(num_classes))
+for i, name in enumerate(classes):
+    print("%2d  %s" % (i, name))
 print("")
+
+open("results/labels.txt", "w").write("\n".join(classes) + "\n")
 
 print("Creating datasets...")
 train_ds = train_ds.map(lambda x, y: (augment(x, training=True), y))
@@ -53,22 +60,22 @@ test_ds = test_ds.prefetch(tf.data.AUTOTUNE)
 print("Augmentation applied to training data only.")
 print("")
 
-n_healthy = len(os.listdir("dataset/train/Healthy"))
-n_unhealthy = len(os.listdir("dataset/train/Unhealthy"))
-total = n_healthy + n_unhealthy
+counts = []
+for name in classes:
+    counts.append(len(os.listdir(os.path.join("dataset/train", name))))
+total = sum(counts)
 
 weights = {}
-weights[0] = total / (2 * n_healthy)
-weights[1] = total / (2 * n_unhealthy)
+for i in range(num_classes):
+    weights[i] = total / (num_classes * counts[i])
 
 print("Training images per class:")
-print("Healthy: " + str(n_healthy))
-print("Unhealthy: " + str(n_unhealthy))
-print("Class weights: Healthy " + str(round(weights[0], 3)) + ", Unhealthy " + str(round(weights[1], 3)))
+for i, name in enumerate(classes):
+    print("%-52s %5d   weight %.2f" % (name, counts[i], weights[i]))
 print("")
 
 print("Building model...")
-model, base = build_model()
+model, base = build_model(num_classes)
 model.summary()
 print("")
 
@@ -110,7 +117,7 @@ for layer in base.layers:
 
 model.compile(
     optimizer=keras.optimizers.Adam(learning_rate=0.00001),
-    loss="binary_crossentropy",
+    loss="sparse_categorical_crossentropy",
     metrics=["accuracy"]
 )
 
@@ -146,55 +153,57 @@ model = keras.models.load_model("results/model.keras")
 
 test_loss, test_acc = model.evaluate(test_ds)
 
-y_true = np.concatenate([y for x, y in test_ds]).flatten()
-y_prob = model.predict(test_ds).flatten()
-y_pred = (y_prob > 0.5).astype(int)
+y_true = np.concatenate([y for x, y in test_ds])
+y_prob = model.predict(test_ds)
+y_pred = np.argmax(y_prob, axis=1)
 
-precision = precision_score(y_true, y_pred)
-recall = recall_score(y_true, y_pred)
-f1 = f1_score(y_true, y_pred)
+precision = precision_score(y_true, y_pred, average="macro")
+recall = recall_score(y_true, y_pred, average="macro")
+f1 = f1_score(y_true, y_pred, average="macro")
 matrix = confusion_matrix(y_true, y_pred)
-report = classification_report(y_true, y_pred, target_names=classes)
+report = classification_report(y_true, y_pred, target_names=classes, digits=3)
 
 print("")
 print("Test Accuracy: " + str(round(test_acc * 100, 2)) + "%")
 print("Test Loss: " + str(round(test_loss, 4)))
-print("Precision: " + str(round(precision, 4)))
-print("Recall: " + str(round(recall, 4)))
-print("F1 Score: " + str(round(f1, 4)))
-print("")
-print("Confusion Matrix:")
-print(matrix)
+print("Macro Precision: " + str(round(precision, 4)))
+print("Macro Recall: " + str(round(recall, 4)))
+print("Macro F1 Score: " + str(round(f1, 4)))
 print("")
 print("Classification Report:")
 print(report)
 
+print("Worst classes by recall:")
+per_class = recall_score(y_true, y_pred, average=None)
+order = np.argsort(per_class)
+for i in order[:5]:
+    print("%-52s recall %.3f" % (classes[i], per_class[i]))
+print("")
+
 print("Saving results...")
 
 metrics_text = ""
+metrics_text += "Classes: " + str(num_classes) + "\n"
 metrics_text += "Test Accuracy: " + str(round(test_acc * 100, 2)) + "%\n"
 metrics_text += "Test Loss: " + str(round(test_loss, 4)) + "\n"
-metrics_text += "Precision: " + str(round(precision, 4)) + "\n"
-metrics_text += "Recall: " + str(round(recall, 4)) + "\n"
-metrics_text += "F1 Score: " + str(round(f1, 4)) + "\n"
-metrics_text += "\nConfusion Matrix:\n" + str(matrix) + "\n"
+metrics_text += "Macro Precision: " + str(round(precision, 4)) + "\n"
+metrics_text += "Macro Recall: " + str(round(recall, 4)) + "\n"
+metrics_text += "Macro F1 Score: " + str(round(f1, 4)) + "\n"
 
 open("results/metrics.txt", "w").write(metrics_text)
 open("results/classification_report.txt", "w").write(report)
+np.savetxt("results/confusion_matrix.csv", matrix, fmt="%d", delimiter=",")
 
-plt.figure()
+plt.figure(figsize=(16, 14))
 plt.imshow(matrix, cmap="Blues")
 plt.title("Confusion Matrix")
 plt.xlabel("Predicted")
 plt.ylabel("Actual")
-plt.xticks([0, 1], classes)
-plt.yticks([0, 1], classes)
+plt.xticks(range(num_classes), classes, rotation=90, fontsize=7)
+plt.yticks(range(num_classes), classes, fontsize=7)
 plt.colorbar()
-for i in range(2):
-    for j in range(2):
-        color = "white" if matrix[i][j] > matrix.max() / 2 else "black"
-        plt.text(j, i, str(matrix[i][j]), ha="center", va="center", color=color)
-plt.savefig("results/confusion_matrix.png")
+plt.tight_layout()
+plt.savefig("results/confusion_matrix.png", dpi=120)
 plt.close()
 
 plt.figure()

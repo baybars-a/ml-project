@@ -1,9 +1,6 @@
-Test Accuracy: 99.55%
-Test Loss: 0.0126
-Precision: 0.998
-Recall: 0.9958
-F1 Score: 0.9969
-
-Confusion Matrix:
-[[2251   12]
- [  25 5859]]
+Classes: 38
+Test Accuracy: 97.23%
+Test Loss: 0.0844
+Macro Precision: 0.9694
+Macro Recall: 0.9632
+Macro F1 Score: 0.9648

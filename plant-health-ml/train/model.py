@@ -2,7 +2,7 @@ from tensorflow import keras
 from tensorflow.keras import layers
 
 
-def build_model():
+def build_model(num_classes):
     base = keras.applications.MobileNetV2(
         input_shape=(160, 160, 3),
         include_top=False,
@@ -16,12 +16,12 @@ def build_model():
         base,
         layers.GlobalAveragePooling2D(),
         layers.Dropout(0.2),
-        layers.Dense(1, activation="sigmoid")
+        layers.Dense(num_classes, activation="softmax")
     ])
 
     model.compile(
         optimizer=keras.optimizers.Adam(learning_rate=0.0001),
-        loss="binary_crossentropy",
+        loss="sparse_categorical_crossentropy",
         metrics=["accuracy"]
     )
 
